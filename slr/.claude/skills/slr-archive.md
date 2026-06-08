@@ -1,16 +1,16 @@
 ---
 name: slr-archive
-description: Toggle automated turn-by-turn session archiving on or off for the SLR project. Default is on. Use `/slr-archive on`, `/slr-archive off`, or `/slr-archive status`.
-allowed-tools: Read, Edit, Write, Bash(cat *), Bash(bash -n *)
+description: Toggle automated turn-by-turn session archiving on or off for the SLR project, and generate end-of-session summaries. Default is on. Use `/slr-archive on`, `/slr-archive off`, `/slr-archive summary`, or `/slr-archive status`.
+allowed-tools: Read, Edit, Write, Bash(cat *), Bash(bash -n *), Bash(bash slr/scripts/archive-session.sh *), Bash(bash scripts/archive-session.sh *)
 ---
 
 # slr-archive
 
-Toggle the automated Stop hook that writes a turn marker to `methodology/chat-history/YYYY-MM-DD_auto.md` after every Claude response.
+Toggle the automated Stop hook that writes a turn marker to `methodology/chat-history/YYYY-MM-DD_auto.md` after every Claude response. Also generates end-of-session summary documents via `archive-session.sh --mode summary`.
 
 ## Inputs
 
-Argument: `on`, `off`, or `status`. If omitted, treat as `status`.
+Argument: `on`, `off`, `summary`, or `status`. If omitted, treat as `status`.
 
 ## Settings file location
 
@@ -59,14 +59,28 @@ When **disabled**, the `Stop` key is present but the hooks array is empty:
 5. Report: "Archiving turned **on**. Turn markers will be written after each response."
 
 ### `off`
-1. Read `slr/.claude/settings.json`.
-2. If already disabled (empty Stop array), report "Already off" and stop.
-3. Otherwise set `hooks.Stop` to `[]`.
-4. Write the file back.
-5. Report: "Archiving turned **off**. Existing logs in `methodology/chat-history/` are untouched."
+1. Generate a session summary first — follow the full `summary` workflow below.
+2. Read `slr/.claude/settings.json`.
+3. If already disabled (empty Stop array), report "Already off" (but the summary was still generated).
+4. Otherwise set `hooks.Stop` to `[]`.
+5. Write the file back.
+6. Report: "Archiving turned **off**. Summary written to `<path>`. Restart Claude Code for the hook change to take effect."
+
+### `summary`
+1. Ask the user for a short session title (one line). If they provide one as an argument after `summary`, use that directly without asking.
+2. Run: `bash scripts/archive-session.sh --mode summary --title "<title>"`
+   - If running from outside the `slr/` directory, use the full path: `bash slr/scripts/archive-session.sh --mode summary --title "<title>"`
+3. The script prints the path of the created file. Read that file.
+4. Fill in the three template sections based on this conversation:
+   - **Summary**: one paragraph covering what was accomplished this session
+   - **Key decisions**: bullet list of decisions made, each with a brief rationale
+   - **Next steps**: what to pick up next session
+5. Write the filled-in content back to the file.
+6. Report the file path and a one-line summary of what was captured.
 
 ## Notes
 
 - Never touch `settings.local.json` — that file holds per-machine permissions.
 - The hook script itself is at `slr/scripts/auto-archive-hook.sh`; this skill only controls whether it is wired to the Stop event.
-- After toggling, tell the user to **restart Claude Code** for the change to take effect.
+- After toggling on/off, tell the user to **restart Claude Code** for the hook change to take effect.
+- `summary` does **not** affect the hook state — archiving stays on after generating a summary.
