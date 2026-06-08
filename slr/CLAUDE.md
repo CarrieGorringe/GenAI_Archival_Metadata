@@ -36,7 +36,7 @@ Every working session in this directory is archived to `methodology/chat-history
 
 A `Stop` hook runs `scripts/auto-archive-hook.sh` after every Claude response. It appends a timestamped turn marker to:
 
-```
+```text
 methodology/chat-history/YYYY-MM-DD_auto.md
 ```
 
