@@ -15,43 +15,94 @@ slr/
   CLAUDE.md                        ← this file; scoped guidance for working in this directory
   .env.example                     ← Zotero API key template (commit this)
   .env                             ← your actual keys (gitignored — never commit)
+  .claude/
+    settings.json                  ← project-level Claude Code settings (Stop hook, on by default)
+    settings.local.json            ← per-machine permissions (gitignored)
+    skills/
+      slr-archive.md               ← /slr-archive skill for toggling auto-archiving
   methodology/
-    chat-history/                  ← 30-min session checkpoints + end-of-session summaries
+    chat-history/                  ← auto session logs + manual checkpoints + end-of-session summaries
     ...                            ← SLR protocol, search strategy, PRISMA notes, screening criteria
   scripts/                         ← reusable, parameterized scripts for the SLR
 ```
 
 ## Chat history & session archiving
 
-Every working session in this directory should be archived to `methodology/chat-history/` so decisions and reasoning are traceable across sessions.
+Every working session in this directory is archived to `methodology/chat-history/` so decisions and reasoning are traceable across sessions. Archiving is **automated by default** — a Claude Code hook fires after every response and writes a turn marker to a daily rolling log. A summary skill generates an end-of-session narrative on demand.
 
-### During a session (every ~30 minutes or ~20–25 turns)
+---
 
-Run the archive script to create a timestamped checkpoint:
+### Automated archiving (default — on)
+
+A `Stop` hook runs `scripts/auto-archive-hook.sh` after every Claude response. It appends a timestamped turn marker to:
+
+```text
+methodology/chat-history/YYYY-MM-DD_auto.md
+```
+
+The file is created on the first turn of each day and accumulates markers for the whole day's work. Each marker is a placeholder — fill in notes after the turn or let `/slr-archive summary` populate the summary at the end of the session.
+
+#### Controlling auto-archiving with `/slr-archive`
+
+The `/slr-archive` skill manages the hook. Restart Claude Code after any `on`/`off` toggle for the change to take effect.
+
+| Command | What it does |
+| --- | --- |
+| `/slr-archive status` | Reports whether archiving is on or off; shows today's log path if it exists |
+| `/slr-archive on` | Enables the Stop hook (restores it if previously disabled) |
+| `/slr-archive off` | Generates an end-of-session summary, then disables the hook |
+| `/slr-archive summary` | Generates an end-of-session summary without changing hook state |
+| `/slr-archive summary "My title"` | Same, with a specific title instead of a prompt |
+
+#### End-of-session summary
+
+`/slr-archive summary` (or `off`) runs `archive-session.sh --mode summary` and asks Claude to populate the three template sections from the current conversation:
+
+- **Summary** — one paragraph: what was accomplished
+- **Key decisions** — bullet list with rationale for each
+- **Next steps** — what to pick up next session
+
+The summary file is written to `methodology/chat-history/YYYY-MM-DD_HHMM_<slug>_summary.md`.
+
+**Best practice:** run `/slr-archive summary` (or `/slr-archive off`) while the session is still in context — before it is compressed or a new session starts.
+
+---
+
+### Manual archiving (optional supplement)
+
+Auto-archiving creates structural markers; manual checkpoints let you narrate what happened in detail. Use the archive script directly when you want a richer mid-session record.
+
+#### Checkpoint (every ~30 minutes or ~20–25 turns)
 
 ```bash
 bash slr/scripts/archive-session.sh --mode checkpoint --title "Brief description"
 ```
 
-The script creates `methodology/chat-history/YYYY-MM-DD_HHMM_<slug>.md` and prints the path. After running it, paste or narrate the key turns from the last interval into the file. Include:
+The script creates `methodology/chat-history/YYYY-MM-DD_HHMM_<slug>.md`. After running it, add:
 
 - The user prompt (abbreviated if long)
 - What Claude did or decided
 - Any output files created or changed
 
-### At the end of a session
-
-Run with `--mode summary` to create the closing file:
+#### End-of-session summary (manual alternative)
 
 ```bash
 bash slr/scripts/archive-session.sh --mode summary --title "Session description"
 ```
 
-Then fill in the three template sections: **Summary** (one paragraph), **Key decisions** (bulleted, with rationale), and **Next steps** (what to pick up next session).
+Then fill in the three template sections manually.
+
+---
 
 ### File naming
 
-Files are named `YYYY-MM-DD_HHMM[_slug][_summary].md`. Sort by name to get chronological order. Do not rename or reorganise files once written — they are a permanent audit trail.
+| Pattern | Source |
+| --- | --- |
+| `YYYY-MM-DD_auto.md` | Auto-archive hook (daily rolling log) |
+| `YYYY-MM-DD_HHMM_<slug>.md` | Manual checkpoint |
+| `YYYY-MM-DD_HHMM_<slug>_summary.md` | End-of-session summary (manual or via `/slr-archive summary`) |
+
+Sort by name for chronological order. Do not rename or reorganise files once written — they are a permanent audit trail.
 
 ---
 
@@ -117,7 +168,9 @@ One-off throwaway scripts are exempt; if in doubt, parameterise.
 | Script | Purpose |
 | --- | --- |
 | `archive-session.sh` | Create timestamped checkpoint or summary in `methodology/chat-history/` |
+| `auto-archive-hook.sh` | Claude Code Stop hook — appends turn markers to the daily rolling log |
 | `zotero_client.py` | CLI wrapper for common Zotero API operations (search, tag, list) |
+| `install-search-tools.sh` | Bootstrap Exa, Semantic Scholar, and Zotero on a new machine |
 
 ---
 
